@@ -1,0 +1,178 @@
+name: Portafolio Cloud CI/CD
+
+on:
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portafoliocloud-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    name: Unitarias, integración y E2E
+    runs-on: ubuntu-latest
+    env:
+      CI: "true"
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+            backend/package-lock.json
+      - name: Instalar dependencias
+        run: |
+          npm ci --no-audit --no-fund
+          npm ci --prefix frontend --no-audit --no-fund
+          npm ci --prefix backend --no-audit --no-fund
+      - name: Compilar frontend
+        run: npm run build
+      - name: Tres pruebas unitarias
+        run: npm run test:unit
+      - name: Tres pruebas de integración
+        run: npm run test:integration
+      - name: Instalar Chromium para E2E
+        run: npx playwright install --with-deps chromium
+      - name: Verificar configuración E2E
+        run: |
+          test -n "$SUPABASE_URL" || { echo 'Falta el secret SUPABASE_URL'; exit 1; }
+          test -n "$SUPABASE_PUBLISHABLE_KEY" || { echo 'Falta el secret SUPABASE_PUBLISHABLE_KEY'; exit 1; }
+      - name: Tres pruebas E2E
+        run: npm run test:e2e
+
+  publish:
+    name: Publicar imágenes en Docker Hub
+    if: github.ref == 'refs/heads/main'
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          username: sotofreakin
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Construir y publicar frontend
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            sotofreakin/portafoliocloud-frontend:${{ github.sha }}
+            sotofreakin/portafoliocloud-frontend:latest
+      - name: Construir y publicar backend
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            sotofreakin/portafoliocloud-backend:${{ github.sha }}
+            sotofreakin/portafoliocloud-backend:latest
+
+  terraform:
+    name: Crear o actualizar infraestructura OCI
+    if: github.ref == 'refs/heads/main'
+    needs: publish
+    runs-on: ubuntu-latest
+    outputs:
+      public_ip: ${{ steps.vm.outputs.public_ip }}
+    defaults:
+      run:
+        working-directory: infra
+        shell: bash
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      TF_VAR_compartment_ocid: ${{ secrets.OCI_COMPARTMENT_OCID }}
+      TF_VAR_availability_domain: ${{ secrets.OCI_AVAILABILITY_DOMAIN }}
+      TF_VAR_ubuntu_2404_image_ocid: ${{ secrets.OCI_UBUNTU_2404_IMAGE_OCID }}
+      TF_VAR_ssh_public_key: ${{ secrets.OCI_SSH_PUBLIC_KEY }}
+      OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+      OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+      OCI_REGION: ${{ secrets.OCI_REGION }}
+      OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+      OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+      TF_HTTP_ADDRESS: ${{ secrets.OCI_STATE_PAR_URL }}
+      TF_HTTP_UPDATE_METHOD: PUT
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar secretos OCI
+        run: |
+          for name in OCI_USER_OCID OCI_FINGERPRINT OCI_REGION OCI_TENANCY_OCID OCI_PRIVATE_KEY TF_HTTP_ADDRESS TF_VAR_compartment_ocid TF_VAR_availability_domain TF_VAR_ubuntu_2404_image_ocid TF_VAR_ssh_public_key; do
+            test -n "${!name}" || { echo "Falta el secret $name"; exit 1; }
+          done
+      - name: Preparar configuración OCI temporal
+        run: |
+          install -d -m 700 "$HOME/.oci"
+          printf '%s\n' "$OCI_PRIVATE_KEY" > "$HOME/.oci/key.pem"
+          chmod 600 "$HOME/.oci/key.pem"
+          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\nregion=%s\ntenancy=%s\nkey_file=%s/.oci/key.pem\n' \
+            "$OCI_USER_OCID" "$OCI_FINGERPRINT" "$OCI_REGION" "$OCI_TENANCY_OCID" "$HOME" > "$HOME/.oci/config"
+          chmod 600 "$HOME/.oci/config"
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.6"
+          terraform_wrapper: false
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+      - name: Terraform init con estado remoto OCI
+        run: terraform init -input=false
+      - name: Terraform validate
+        run: terraform validate -no-color
+      - name: Terraform plan
+        run: terraform plan -no-color -out=tfplan
+      - name: Terraform apply
+        run: terraform apply -no-color -auto-approve tfplan
+      - name: Obtener IP pública
+        id: vm
+        run: echo "public_ip=$(terraform output -raw public_ip)" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Desplegar Compose en Ubuntu
+    if: github.ref == 'refs/heads/main'
+    needs: terraform
+    runs-on: ubuntu-latest
+    env:
+      PUBLIC_IP: ${{ needs.terraform.outputs.public_ip }}
+      SSH_PRIVATE_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preparar SSH
+        run: |
+          test -n "$PUBLIC_IP" && test -n "$SSH_PRIVATE_KEY" || { echo 'Falta IP o OCI_SSH_PRIVATE_KEY'; exit 1; }
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/oci_deploy"
+          chmod 600 "$HOME/.ssh/oci_deploy"
+      - name: Esperar SSH y cloud-init
+        run: |
+          for attempt in $(seq 1 60); do
+            if ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 -i "$HOME/.ssh/oci_deploy" "ubuntu@$PUBLIC_IP" 'cloud-init status --wait'; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'La VM no quedó disponible después de 10 minutos'
+          exit 1
+      - name: Copiar Compose y configuración
+        run: |
+          scp -i "$HOME/.ssh/oci_deploy" compose.prod.yaml "ubuntu@$PUBLIC_IP:/opt/portafoliocloud/compose.yaml"
+          printf 'DOCKERHUB_USERNAME=sotofreakin\nIMAGE_TAG=%s\nSUPABASE_URL=%s\nSUPABASE_PUBLISHABLE_KEY=%s\n' \
+            "$GITHUB_SHA" "$SUPABASE_URL" "$SUPABASE_PUBLISHABLE_KEY" | \
+            ssh -i "$HOME/.ssh/oci_deploy" "ubuntu@$PUBLIC_IP" 'umask 077; cat > /opt/portafoliocloud/.env'
+      - name: Activar contenedores y comprobar HTTP
+        run: |
+          ssh -i "$HOME/.ssh/oci_deploy" "ubuntu@$PUBLIC_IP" \
+            'cd /opt/portafoliocloud && sudo docker compose --env-file .env pull && sudo docker compose --env-file .env up -d --no-build --remove-orphans && curl --retry 12 --retry-delay 5 --retry-connrefused -fsS http://127.0.0.1/api/health'
+          echo "Portafolio disponible en http://$PUBLIC_IP/"

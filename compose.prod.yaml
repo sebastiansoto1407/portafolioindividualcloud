@@ -1,0 +1,20 @@
+services:
+  backend:
+    image: ${DOCKERHUB_USERNAME:-sotofreakin}/portafoliocloud-backend:${IMAGE_TAG:?Configura IMAGE_TAG}
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3001
+      SUPABASE_URL: ${SUPABASE_URL:?Configura SUPABASE_URL}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:?Configura SUPABASE_PUBLISHABLE_KEY}
+    expose:
+      - "3001"
+
+  frontend:
+    image: ${DOCKERHUB_USERNAME:-sotofreakin}/portafoliocloud-frontend:${IMAGE_TAG:?Configura IMAGE_TAG}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:8080"
+
