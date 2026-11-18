@@ -1,6 +1,5 @@
-compartment_ocid        = "ocid1.compartment.oc1..REEMPLAZAR"
-availability_domain     = "REEMPLAZAR:SA-SAOPAULO-1-AD-1"
-ubuntu_2404_image_ocid  = "ocid1.image.oc1.sa-saopaulo-1.REEMPLAZAR"
-ssh_public_key          = "ssh-rsa REEMPLAZAR"
-instance_shape          = "VM.Standard.E2.1.Micro"
-
+compartment_ocid = "ocid1.tenancy.oc1..REEMPLAZAR"
+availability_domain = "REEMPLAZAR:SA-SAOPAULO-1-AD-1"
+ubuntu_2404_image_ocid = "ocid1.image.oc1.sa-saopaulo-1.REEMPLAZAR"
+ssh_public_key = "ssh-ed25519 REEMPLAZAR"
+instance_shape = "VM.Standard.E2.1.Micro"

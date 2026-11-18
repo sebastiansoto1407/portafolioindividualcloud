@@ -13,5 +13,6 @@ test-results/
 *.tfplan
 *.pem
 *.key
+infra/.keys/
 
 

@@ -38,6 +38,7 @@ El contenido inicial del perfil, las habilidades, las certificaciones y los proy
 | `compose.yaml` | Orquesta frontend y backend para desarrollo local con Docker. |
 | `compose.prod.yaml` | Descarga las imágenes publicadas en Docker Hub para la VM. |
 | `infra/*.tf` | Crea VCN, dos subredes, gateway, NSG y VM Ubuntu 24.04. |
+| `infra/bootstrap-state/main.tf` | Crea un bucket privado y una URL PAR limitada al estado Terraform. Se aplica una sola vez desde esta computadora. |
 | `infra/scripts/bootstrap.sh` | Instala Docker, Git y reglas iptables en la VM. |
 | `.github/workflows/portfolio.yml` | Ejecuta pruebas en `dev` y pruebas, publicación y despliegue en `main`. |
 
@@ -150,6 +151,8 @@ Crea en Docker Hub dos repositorios **públicos** llamados `portafoliocloud-fron
 | `OCI_STATE_PAR_URL` | URL de una solicitud preautenticada de lectura y escritura para **un objeto de estado exclusivo de este proyecto** en OCI Object Storage. |
 
 Terraform necesita ese estado remoto para que los siguientes pushes actualicen la misma VM en lugar de intentar crear otra. No reutilices el objeto de estado de otra práctica. La URL PAR da acceso al estado y debe guardarse como secreto; recuerda renovarla antes de que expire.
+
+El módulo `infra/bootstrap-state/main.tf` crea el bucket privado `portafoliocloud-tfstate-20261118` con versionado y una solicitud preautenticada de lectura y escritura limitada a `terraform.tfstate`. Su estado local contiene la URL PAR y **no se sube a Git**. La solicitud vence el 18 de noviembre de 2027. Para desplegar por SSH se genera un par de claves exclusivo del proyecto en `infra/.keys/`, también excluido de Git; la clave pública se guarda en `OCI_SSH_PUBLIC_KEY` y la privada en `OCI_SSH_PRIVATE_KEY`.
 
 La VM usa `VM.Standard.E2.1.Micro` por defecto. Cambia `instance_shape` si la imagen Ubuntu elegida o la cuota de tu cuenta requieren otro shape. Oracle debe confirmar esa compatibilidad al ejecutar el plan.
 
