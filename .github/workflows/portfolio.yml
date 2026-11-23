@@ -39,7 +39,7 @@ jobs:
         run: npm run build
       - name: Tres pruebas unitarias
         run: npm run test:unit
-      - name: Tres pruebas de integración
+      - name: Pruebas de integración
         run: npm run test:integration
       - name: Instalar Chromium para E2E
         run: npx playwright install --with-deps chromium
@@ -47,7 +47,7 @@ jobs:
         run: |
           test -n "$SUPABASE_URL" || { echo 'Falta el secret SUPABASE_URL'; exit 1; }
           test -n "$SUPABASE_PUBLISHABLE_KEY" || { echo 'Falta el secret SUPABASE_PUBLISHABLE_KEY'; exit 1; }
-      - name: Tres pruebas E2E
+      - name: Pruebas E2E
         run: npm run test:e2e
 
   publish:

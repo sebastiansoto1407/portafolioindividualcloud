@@ -20,3 +20,20 @@ test('E2E 3: un proyecto muestra su enlace externo correcto', async ({ page }) =
   await expect(project).toBeVisible();
   await expect(project.getByRole('link', { name: /Ver código/ })).toHaveAttribute('href', 'https://github.com/retr0max309/Sucrexpress');
 });
+
+test('E2E contacto: el formulario envía los datos y confirma el guardado', async ({ page }) => {
+  let submitted;
+  await page.route('**/api/contact', async (route) => {
+    submitted = route.request().postDataJSON();
+    await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ status: 'saved' }) });
+  });
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Contacto' }).click();
+  await page.getByLabel('Tu nombre').fill('Ana Pérez');
+  await page.getByLabel('Tu correo').fill('ana@example.com');
+  await page.getByLabel('Tu mensaje').fill('Quiero conversar sobre un proyecto.');
+  await page.getByRole('button', { name: 'Enviar mensaje' }).click();
+  await expect(page.getByRole('status')).toContainText('Tu mensaje fue guardado');
+  expect(submitted).toEqual({ name: 'Ana Pérez', email: 'ana@example.com', message: 'Quiero conversar sobre un proyecto.' });
+  await expect(page.getByLabel('Tu mensaje')).toHaveValue('');
+});

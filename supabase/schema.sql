@@ -1,5 +1,5 @@
 -- Ejecuta este archivo una vez en Supabase > SQL Editor.
--- El frontend solo lee datos a través del backend. No se habilitan escrituras públicas.
+-- Estas tablas de contenido solo permiten lectura pública. El formulario usa contact_messages.sql.
 
 create table if not exists public.profiles (
   slug text primary key,

@@ -58,3 +58,46 @@ test('integración 3: una falla de Supabase produce HTTP 502 sin filtrar detalle
     console.error = originalError;
   }
 });
+
+test('contacto: guarda el nombre, correo y mensaje en Supabase', async () => {
+  const fetchImpl = async (input, options) => {
+    assert.equal(new URL(input).pathname, '/rest/v1/contact_messages');
+    assert.equal(options.method, 'POST');
+    assert.deepEqual(JSON.parse(options.body), {
+      sender_name: 'Ana Pérez',
+      sender_email: 'ana@example.com',
+      body: 'Quiero conversar sobre un proyecto.',
+    });
+    return new Response(null, { status: 201 });
+  };
+  const app = createApp(createDatabase(env, fetchImpl));
+  const response = await request(app).post('/api/contact').send({
+    name: '  Ana Pérez  ', email: ' ana@example.com ', message: '  Quiero conversar sobre un proyecto.  ',
+  }).expect(201);
+  assert.deepEqual(response.body, { status: 'saved' });
+});
+
+test('contacto: rechaza datos inválidos sin llamar a Supabase', async () => {
+  const fetchImpl = () => { throw new Error('No debe llamar a Supabase'); };
+  const app = createApp(createDatabase(env, fetchImpl));
+  await request(app).post('/api/contact').send({ name: 'A', email: 'correo-inválido', message: 'corto' }).expect(400);
+  await request(app).post('/api/contact').send({ name: 'Ana', email: 'ana@example.com', message: '' }).expect(400);
+});
+
+test('contacto: oculta el error de base de datos al visitante', async () => {
+  const fetchImpl = async () => new Response(JSON.stringify({ message: 'detalle interno privado', code: 'XX000' }), {
+    status: 503, headers: { 'Content-Type': 'application/json' },
+  });
+  const app = createApp(createDatabase(env, fetchImpl));
+  const originalError = console.error;
+  console.error = () => {};
+  try {
+    const response = await request(app).post('/api/contact').send({
+      name: 'Ana Pérez', email: 'ana@example.com', message: 'Un mensaje suficientemente largo.',
+    }).expect(502);
+    assert.equal(response.body.error, 'No se pudo enviar el mensaje. Inténtalo de nuevo.');
+    assert.equal(JSON.stringify(response.body).includes('detalle interno privado'), false);
+  } finally {
+    console.error = originalError;
+  }
+});

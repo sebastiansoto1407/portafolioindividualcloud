@@ -26,3 +26,14 @@ h1,h2,h3{font-family:Outfit,'DM Sans',sans-serif}
 .state-message{min-height:60vh;padding:100px 0;text-align:center}.state-message p{color:#bbb0ba}.footer{border-top:1px solid #302830;padding:38px 0;color:#a79ba6}.footer .container{display:flex;justify-content:space-between;align-items:center;gap:16px}.footer p{margin:0;font-size:13px}
 @media(max-width:850px){.skills-grid,.projects-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.nav-links{gap:15px}.nav-links a{font-size:12px}}
 @media(max-width:600px){.container{width:min(100% - 28px,1180px)}.nav{min-height:66px}.nav-links{gap:10px;overflow-x:auto}.nav-links a{font-size:11px;white-space:nowrap}.brand{font-size:22px}.hero{padding:45px 0 70px}.portrait-wrap{width:145px;height:145px;margin-bottom:32px}.intro{font-size:15px}.section{padding:68px 0}.skills-grid,.cert-grid,.projects-grid{grid-template-columns:1fr}.footer .container{display:block}.footer p{margin-top:12px}}
+
+.contact-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:42px;align-items:start}
+.section[id]{scroll-margin-top:90px}
+.contact-copy{padding:24px 0}.contact-copy h3{font-size:clamp(26px,3vw,36px);margin-bottom:16px}.contact-copy p{color:#bcb2ba;font-size:17px;line-height:1.7;max-width:440px}
+.contact-form{display:grid;gap:10px;padding:30px}.contact-form label{font-size:14px;font-weight:700;color:#f6f2f4;margin-top:7px}
+.contact-form input,.contact-form textarea{width:100%;border:1px solid #554451;border-radius:10px;background:#151218;color:#fff;padding:13px 15px;font:inherit;resize:vertical}
+.contact-form input::placeholder,.contact-form textarea::placeholder{color:#938993}
+.contact-form input:focus-visible,.contact-form textarea:focus-visible,.contact-submit:focus-visible{outline:2px solid #eeb95b;outline-offset:2px}
+.contact-submit{border:0;justify-content:center;margin-top:12px;font:700 15px 'DM Sans',sans-serif;cursor:pointer}
+.contact-submit:disabled{opacity:.65;cursor:wait}.contact-feedback{margin:6px 0 0;font-size:14px;line-height:1.5}.contact-feedback.success{color:#8ee1a4}.contact-feedback.error{color:#ff8d9f}
+@media(max-width:850px){.contact-layout{grid-template-columns:1fr;gap:18px}.contact-copy{padding:0}.contact-form{padding:22px}}

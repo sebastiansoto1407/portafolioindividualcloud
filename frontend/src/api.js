@@ -16,3 +16,16 @@ export async function getPortfolio() {
   return { profile, skills, certifications, projects };
 }
 
+export async function sendContactMessage(contact) {
+  const response = await fetch('/api/contact', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(contact),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.error || 'No se pudo enviar el mensaje. Inténtalo de nuevo.');
+  }
+  return result;
+}
+

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getPortfolio } from './api.js';
+import { getPortfolio, sendContactMessage } from './api.js';
 import { formatCertificationDate, getProjectLink, uniqueNonBlankItems } from './presentation.js';
 
 const portraitUrl = 'https://sebastiansoto1407.github.io/portafoliodevida/fotoyo1.jpeg';
@@ -14,6 +14,7 @@ function Header() {
           <a href="#habilidades">Habilidades</a>
           <a href="#certificaciones">Certificaciones</a>
           <a href="#proyectos">Proyectos</a>
+          <a href="#contacto">Contacto</a>
         </div>
       </nav>
     </header>
@@ -35,6 +36,7 @@ function Hero({ profile }) {
         <p className="intro">{profile.bio}</p>
         <div className="hero-actions">
           <a className="button primary" href="#proyectos">Explorar proyectos <span aria-hidden="true">↗</span></a>
+          <a className="button secondary" href="#contacto">Contáctame <span aria-hidden="true">↗</span></a>
           <a className="button secondary" href="https://github.com/sebastiansoto1407" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a>
         </div>
       </div>
@@ -108,6 +110,58 @@ function Projects({ projects }) {
   );
 }
 
+const emptyContact = { name: '', email: '', message: '' };
+
+function ContactForm() {
+  const [contact, setContact] = useState(emptyContact);
+  const [sending, setSending] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+
+  function updateField(event) {
+    const { name, value } = event.target;
+    setContact((current) => ({ ...current, [name]: value }));
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    setSending(true);
+    setFeedback(null);
+    try {
+      await sendContactMessage(contact);
+      setContact(emptyContact);
+      setFeedback({ success: true, text: '¡Gracias! Tu mensaje fue guardado. Te responderé por correo.' });
+    } catch (error) {
+      setFeedback({ success: false, text: error.message });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <section className="section section-alt" id="contacto">
+      <div className="container">
+        <SectionHeading eyebrow="HABLEMOS">Contáctame</SectionHeading>
+        <div className="contact-layout">
+          <div className="contact-copy">
+            <h3>¿Tienes una idea o quieres colaborar?</h3>
+            <p>Déjame tu nombre, correo y mensaje. Lo recibiré de forma privada y podré responderte.</p>
+          </div>
+          <form className="card contact-form" onSubmit={submit}>
+            <label htmlFor="contact-name">Tu nombre</label>
+            <input id="contact-name" name="name" type="text" autoComplete="name" required minLength={2} maxLength={80} value={contact.name} onChange={updateField} placeholder="¿Cómo te llamas?" />
+            <label htmlFor="contact-email">Tu correo</label>
+            <input id="contact-email" name="email" type="email" autoComplete="email" required maxLength={254} value={contact.email} onChange={updateField} placeholder="nombre@ejemplo.com" />
+            <label htmlFor="contact-message">Tu mensaje</label>
+            <textarea id="contact-message" name="message" required minLength={10} maxLength={2000} rows={6} value={contact.message} onChange={updateField} placeholder="Cuéntame en qué puedo ayudarte…" />
+            <button className="button primary contact-submit" type="submit" disabled={sending}>{sending ? 'Enviando…' : 'Enviar mensaje'}</button>
+            {feedback && <p className={feedback.success ? 'contact-feedback success' : 'contact-feedback error'} role={feedback.success ? 'status' : 'alert'}>{feedback.text}</p>}
+          </form>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -123,7 +177,7 @@ export default function App() {
       <Header />
       {error && <main className="container state-message" role="alert"><h1>No se pudo cargar el portafolio</h1><p>{error}</p><p>Revisa que el backend esté iniciado y que Supabase esté configurado.</p></main>}
       {!error && !data && <main className="container state-message" role="status"><p>Cargando portafolio…</p></main>}
-      {data && <main><Hero profile={data.profile} /><Skills skills={data.skills} /><Certifications certifications={data.certifications} /><Projects projects={data.projects} /></main>}
+      {data && <main><Hero profile={data.profile} /><Skills skills={data.skills} /><Certifications certifications={data.certifications} /><Projects projects={data.projects} /><ContactForm /></main>}
       <footer className="footer"><div className="container"><strong>AS<span>SA</span></strong><p>© 2026 Andres Sebastian Soto Astete. Sistemas & Desarrollo.</p></div></footer>
     </>
   );

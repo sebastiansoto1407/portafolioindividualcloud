@@ -6,9 +6,9 @@ Este proyecto convierte el [portafolio público original](https://sebastiansoto1
 Navegador → React + Vite → API Express → Supabase PostgreSQL
 ```
 
-El contenido inicial del perfil, las habilidades, las certificaciones y los proyectos se guarda en PostgreSQL. El frontend **no consulta Supabase directamente**; siempre llama a la API local. Las tablas permiten lectura pública de registros publicados y no permiten escritura pública.
+El contenido inicial del perfil, las habilidades, las certificaciones y los proyectos se guarda en PostgreSQL. El frontend **no consulta Supabase directamente**; siempre llama a la API local. Las tablas del portafolio son de solo lectura pública. El formulario de contacto guarda mensajes en una tabla separada que admite inserciones, pero no lectura pública.
 
-**Estado actual:** el proyecto [portafoliocloud en Supabase](https://supabase.com/dashboard/project/jehyebejmdfmxbhzttla) ya está creado en São Paulo. Se ejecutaron el esquema y los datos iniciales: 1 perfil, 6 grupos de habilidades, 10 certificaciones y 10 proyectos. `backend/.env` ya contiene la URL y clave publicable de ese proyecto en esta computadora.
+**Estado actual:** el proyecto [portafoliocloud en Supabase](https://supabase.com/dashboard/project/jehyebejmdfmxbhzttla) ya está creado en São Paulo. Se ejecutaron el esquema y los datos iniciales: 1 perfil, 6 grupos de habilidades, 10 certificaciones y 10 proyectos. También se creó la tabla `contact_messages` para recibir envíos en vivo. `backend/.env` ya contiene la URL y clave publicable de ese proyecto en esta computadora.
 
 ## Estructura y función de cada archivo
 
@@ -18,20 +18,21 @@ El contenido inicial del perfil, las habilidades, las certificaciones y los proy
 | `frontend/index.html` | HTML base donde React monta la aplicación. |
 | `frontend/vite.config.js` | Configura Vite y redirige `/api` al backend durante desarrollo. |
 | `frontend/src/main.jsx` | Punto de entrada de React. |
-| `frontend/src/App.jsx` | Componentes de portada, habilidades, certificaciones y proyectos. |
+| `frontend/src/App.jsx` | Componentes de portada, habilidades, certificaciones, proyectos y formulario de contacto. |
 | `frontend/src/api.js` | Cuatro llamadas HTTP al backend. |
 | `frontend/src/styles.css` | Diseño visual y reglas para móvil. |
 | `backend/.env.example` | Plantilla de configuración; copiar a `.env`. |
 | `backend/src/server.js` | Inicia Express en el puerto 3001. |
-| `backend/src/app.js` | Define las rutas HTTP y la respuesta de errores. |
+| `backend/src/app.js` | Define las rutas HTTP, valida el formulario e inserta mensajes en Supabase. |
 | `backend/src/db.js` | Crea el cliente de Supabase con la URL y clave publicable. |
-| `supabase/schema.sql` | Crea tablas, políticas RLS y permisos de solo lectura. |
+| `supabase/schema.sql` | Crea las tablas de contenido con políticas RLS de solo lectura. |
 | `supabase/seed.sql` | Inserta el contenido inicial del portafolio. |
+| `supabase/contact_messages.sql` | Crea la tabla de mensajes y permite solo insertar, sin lectura pública. |
 | `.gitignore` | Excluye dependencias, compilaciones y secretos locales. |
 | `frontend/src/presentation.js` | Limpia habilidades, formatea fechas y filtra enlaces inseguros. |
 | `frontend/test/presentation.test.js` | Tres pruebas unitarias. |
-| `backend/test/api.test.js` | Tres pruebas de integración HTTP + cliente Supabase. |
-| `e2e/portfolio.spec.js` | Tres pruebas de navegador con React, Express y Supabase real. |
+| `backend/test/api.test.js` | Pruebas de integración HTTP, Supabase y validación del contacto. |
+| `e2e/portfolio.spec.js` | Pruebas de navegador de la página y del formulario. |
 | `playwright.config.js` | Arranca los servidores y configura Chromium para E2E. |
 | `frontend/Dockerfile` | Construye React y lo sirve con Nginx. |
 | `backend/Dockerfile` | Empaqueta la API Express. |
@@ -47,7 +48,7 @@ El contenido inicial del perfil, las habilidades, las certificaciones y los proy
 La configuración de esta computadora ya está terminada. Si reproduces el proyecto en otra cuenta o máquina:
 
 1. Crea un proyecto Supabase llamado `portafoliocloud`. Guarda la contraseña de la base de datos en un gestor de contraseñas; este proyecto **no la necesita** para leer los datos.
-2. Abre **SQL Editor** en ese proyecto. Ejecuta primero `supabase/schema.sql` y después `supabase/seed.sql`.
+2. Abre **SQL Editor** en ese proyecto. Ejecuta `supabase/schema.sql`, `supabase/seed.sql` y `supabase/contact_messages.sql`, en ese orden.
 3. En **Project Settings → API Keys**, copia la **Project URL** y la **publishable key** (`sb_publishable_…`). No utilices una `secret key` ni `service_role` para este ejemplo.
 4. Copia `backend/.env.example` a `backend/.env` y sustituye los dos valores de Supabase. `.env` está ignorado por Git.
 
@@ -60,7 +61,7 @@ SUPABASE_URL=https://ID-DEL-PROYECTO.supabase.co
 SUPABASE_PUBLISHABLE_KEY=sb_publishable_TU_CLAVE
 ```
 
-La clave publicable no da acceso de administrador: las políticas RLS de `schema.sql` limitan la lectura a registros con `published = true`. La API no ofrece rutas para crear, modificar o borrar datos; para editarlos se usa el panel de Supabase o SQL autorizado.
+La clave publicable no da acceso de administrador: las políticas RLS de `schema.sql` limitan la lectura a registros con `published = true`. La ruta `POST /api/contact` permite guardar mensajes, pero la tabla `contact_messages` no concede lectura, actualización ni eliminación a visitantes. Para verlos, abre **Supabase → Table Editor → contact_messages** con tu cuenta.
 
 ## 2. Instalar y ejecutar
 
@@ -85,6 +86,8 @@ Invoke-RestMethod http://127.0.0.1:3001/api/projects
 
 `GET /api/health` confirma que Express responde. Las rutas de contenido (`/api/profile`, `/api/skills`, `/api/certifications`, `/api/projects`) leen PostgreSQL a través de Supabase.
 
+El formulario envía `POST /api/contact` con `name`, `email` y `message`. Express valida los datos y guarda `sender_name`, `sender_email`, `body` y `created_at` en Supabase. Una respuesta `201` confirma el guardado.
+
 ## Cómo funciona una petición
 
 1. `App.jsx` llama a `getPortfolio()` de `api.js` al cargar la página.
@@ -94,7 +97,7 @@ Invoke-RestMethod http://127.0.0.1:3001/api/projects
 5. Supabase aplica las políticas RLS y devuelve los registros publicados.
 6. React presenta los datos en tarjetas. Si falla la API, muestra un mensaje de error.
 
-## 3. Ejecutar las nueve pruebas
+## 3. Ejecutar las pruebas
 
 ```powershell
 npm run test:unit
@@ -102,7 +105,7 @@ npm run test:integration
 npm run test:e2e
 ```
 
-Las tres pruebas unitarias comprueban fechas, enlaces HTTPS y habilidades. Las tres de integración recorren rutas HTTP de Express con el cliente real de Supabase y respuestas de red simuladas. Las tres E2E abren Chromium y leen el proyecto Supabase configurado en `backend/.env`. Instala Chromium una vez con `npx playwright install chromium`.
+Las tres pruebas unitarias comprueban fechas, enlaces HTTPS y habilidades. Las pruebas de integración recorren rutas HTTP de Express con el cliente real de Supabase y respuestas de red simuladas, incluidos el guardado y la validación del contacto. Las E2E abren Chromium y leen el proyecto Supabase configurado en `backend/.env`; la prueba del formulario simula la respuesta de la API para no generar mensajes de prueba en cada push. Instala Chromium una vez con `npx playwright install chromium`.
 
 ## 4. Docker y Compose
 
@@ -124,7 +127,7 @@ El archivo `.github/workflows/portfolio.yml` se ejecuta con cada push a `dev` o 
 
 | Rama | Acciones |
 | --- | --- |
-| `dev` | Instala dependencias, compila y ejecuta 3 pruebas unitarias, 3 de integración y 3 E2E. |
+| `dev` | Instala dependencias, compila y ejecuta al menos 3 pruebas de cada tipo. |
 | `main` | Ejecuta esas pruebas; si pasan, publica las dos imágenes en Docker Hub, aplica Terraform y despliega Compose por SSH. |
 
 El repositorio indicado para esta práctica es `https://github.com/sebastiansoto1407/portafolioindividualcloud.git`. **No subas** `backend/.env`, la clave OCI `.pem`, la clave SSH privada ni el estado de Terraform. `.gitignore` los excluye.
